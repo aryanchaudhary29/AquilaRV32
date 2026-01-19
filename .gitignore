@@ -27,6 +27,14 @@
 .vscode/
 .idea/
 
+# Simulator executables
+*_tb
+
+# Additional waveform formats
+*.vpd
+*.fsdb
+
+
 # -----------------------------
 # OS generated files
 # -----------------------------
