@@ -18,7 +18,7 @@ module Fetch (
     output reg  [31:0] instr_out
 );
 
-    pc u_pc (
+    pc_update u_pc (
         .clk(clk),
         .rst(rst),
         .stall(stall),
