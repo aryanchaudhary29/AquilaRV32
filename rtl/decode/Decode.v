@@ -20,14 +20,20 @@ module Decode (
     output wire [4:0]  dec_rs2,
     output wire [4:0]  dec_rd,
 
-    output wire [31:0] dec_opa,
-    output wire [31:0] dec_opb,
-    output wire [31:0] dec_imm,
+    // Raw operands (to EX)
+    output wire [31:0] dec_rs1_val,
+    output wire [31:0] dec_rs2_val,
+    output reg  [31:0] dec_imm,
 
-    output wire        dec_reg_write,
-    output wire [1:0]  dec_mem_to_reg,
+    // Control to EX
+    output wire        dec_opa_sel,
+    output wire        dec_opb_sel,
+    output wire [1:0]  dec_imm_sel,
     output wire [3:0]  dec_alu_op,
 
+    // Control to later stages
+    output wire        dec_reg_write,
+    output wire [1:0]  dec_mem_to_reg,
     output wire        dec_is_load,
     output wire        dec_is_store,
     output wire        dec_is_branch,
@@ -35,16 +41,19 @@ module Decode (
     output wire        dec_is_jalr
 );
 
+    // ----------------------------
+    // Instruction fields
+    // ----------------------------
     assign dec_rs1 = id_instr[19:15];
     assign dec_rs2 = id_instr[24:20];
     assign dec_rd  = id_instr[11:7];
 
     assign dec_pc    = id_pc;
     assign dec_valid = id_valid;
-    
-    wire dec_opa_sel;
-    wire dec_opb_sel;
 
+    // ----------------------------
+    // Control unit
+    // ----------------------------
     control_unit u_control_unit (
         .id_valid       (id_valid),
         .instr          (id_instr),
@@ -60,12 +69,16 @@ module Decode (
 
         .dec_opa_sel    (dec_opa_sel),
         .dec_opb_sel    (dec_opb_sel),
+        .dec_imm_sel    (dec_imm_sel),
         .dec_alu_op     (dec_alu_op)
     );
 
+    // ----------------------------
+    // Immediate generation
+    // ----------------------------
     wire [31:0] imm_i, imm_s, imm_b, imm_u, imm_j;
 
-    imm_gen u_immediate_gen (
+    imm_gen u_imm_gen (
         .instr (id_instr),
         .imm_i (imm_i),
         .imm_s (imm_s),
@@ -74,20 +87,20 @@ module Decode (
         .imm_j (imm_j)
     );
 
-   always @(*) begin
-    case (imm_sel)
-        2'b00: dec_imm = imm_i;
-        2'b01: dec_imm = imm_s;
-        2'b10: dec_imm = imm_b;
-        2'b11: dec_imm = imm_u; // or imm_j depending on control
-        default: dec_imm = imm_i;
-    endcase
-end
+    // Immediate selection (still Decode responsibility)
+    always @(*) begin
+        case (dec_imm_sel)
+            2'b00: dec_imm = imm_i; // I-type
+            2'b01: dec_imm = imm_s; // S-type
+            2'b10: dec_imm = imm_b; // B-type
+            2'b11: dec_imm = imm_u; // U/J-type (jal handled via control)
+            default: dec_imm = imm_i;
+        endcase
+    end
 
-
-    wire [31:0] rs1_val;
-    wire [31:0] rs2_val;
-
+    // ----------------------------
+    // Register file
+    // ----------------------------
     register_file u_register_file (
         .clk          (clk),
         .rst          (rst),
@@ -99,15 +112,9 @@ end
         .wb_data      (wb_data),
         .wb_reg_write (wb_reg_write),
 
-        .rs1_val      (rs1_val),
-        .rs2_val      (rs2_val)
+        .rs1_val      (dec_rs1_val),
+        .rs2_val      (dec_rs2_val)
     );
-
-    // ----------------------------
-    // Operand selection
-    // ----------------------------
-    assign dec_opa = dec_opa_sel ? dec_pc  : rs1_val;
-    assign dec_opb = dec_opb_sel ? dec_imm : rs2_val;
 
 endmodule
 
